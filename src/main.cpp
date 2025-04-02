@@ -13,7 +13,7 @@
 #if !defined(MICRO_ROS_TRANSPORT_ARDUINO_SERIAL)
 #error This example is only avaliable for Arduino framework with serial transport.
 #endif
-
+//test
 rcl_publisher_t publisher;
 rcl_subscription_t subscriber;
 std_msgs__msg__Int32MultiArray msg;
