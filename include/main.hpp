@@ -108,3 +108,4 @@ int servo_duty_cycle = 0;
 void emergency_ISR();
 void emergency_sequance();
 void recover_from_emergency();
+void teensy_setup();

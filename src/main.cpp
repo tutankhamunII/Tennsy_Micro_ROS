@@ -125,3 +125,65 @@ void init_microros(){
   actuator_positions_command.data.data = (float*) malloc(sizeof(float) * actuator_positions_command.data.capacity);
   actuator_positions_command.data.size = 8;  
 }
+
+
+void teensy_setup(){
+  pinMode(power_LED_blue_pin, OUTPUT);
+  pinMode(power_LED_green_pin, OUTPUT);
+  pinMode(power_LED_red_pin, OUTPUT);
+  pinMode(communication_LED_blue_pin, OUTPUT);
+  pinMode(communication_LED_green_pin, OUTPUT);
+  pinMode(communication_LED_red_pin, OUTPUT);
+  pinMode(switch_control_pin, OUTPUT);
+  pinMode(voltage_translator_control_pin, OUTPUT);
+  pinMode(estop_signal_pin, INPUT_PULLUP); //the pullup is to prevent false interrupts on floating states.
+  pinMode(switch_status_pin, INPUT);
+  pinMode(main_power_feedback_pin, INPUT);
+  pinMode(total_current_feedback_pin, INPUT);
+  pinMode(temperature_pin, INPUT);
+  pinMode(servo_position_control_pin, OUTPUT);
+  pinMode(servo_power_control_pin, OUTPUT);
+  pinMode(servo_current_feedback_pin, INPUT);
+  pinMode(actuator_1_position_control_pin, OUTPUT);
+  pinMode(actuator_2_position_control_pin, OUTPUT);
+  pinMode(actuator_3_position_control_pin, OUTPUT);
+  pinMode(actuator_4_position_control_pin, OUTPUT);
+  pinMode(actuator_4_position_control_pin, OUTPUT);
+  pinMode(actuator_5_position_control_pin, OUTPUT);
+  pinMode(actuator_6_position_control_pin, OUTPUT);
+  pinMode(actuator_1_power_control_pin, OUTPUT);
+  pinMode(actuator_2_power_control_pin, OUTPUT);
+  pinMode(actuator_3_power_control_pin, OUTPUT);
+  pinMode(actuator_4_power_control_pin, OUTPUT);
+  pinMode(actuator_5_power_control_pin, OUTPUT);
+  pinMode(actuator_6_power_control_pin, OUTPUT);
+  pinMode(actuator_1_position_feedback_pin,INPUT);
+  pinMode(actuator_2_position_feedback_pin,INPUT);
+  pinMode(actuator_3_position_feedback_pin,INPUT);
+  pinMode(actuator_4_position_feedback_pin,INPUT);
+  pinMode(actuator_5_position_feedback_pin,INPUT);
+  pinMode(actuator_6_position_feedback_pin,INPUT);
+  pinMode(actuator_1_current_feedback_pin,INPUT);
+  pinMode(actuator_2_current_feedback_pin,INPUT);
+  pinMode(actuator_3_current_feedback_pin,INPUT);
+  pinMode(actuator_4_current_feedback_pin,INPUT);
+  pinMode(actuator_5_current_feedback_pin,INPUT);
+  pinMode(actuator_6_current_feedback_pin,INPUT);
+
+  //Adjusting the frequency and resolution of the actuator control pins
+  analogWriteFrequency(actuator_1_position_control_pin, 1000);
+  analogWriteFrequency(actuator_2_position_control_pin, 1000);
+  analogWriteFrequency(actuator_3_position_control_pin, 1000);
+  analogWriteFrequency(actuator_4_position_control_pin, 1000);
+  analogWriteFrequency(actuator_5_position_control_pin, 1000);
+//analogWriteFrequency(servo_position_control_pin, 1000) //adjust this frequency based on servo data sheet
+  analogWriteResolution(actuator_1_position_control_pin,15);
+  analogWriteResolution(actuator_2_position_control_pin,15);
+  analogWriteResolution(actuator_3_position_control_pin,15);
+  analogWriteResolution(actuator_4_position_control_pin,15);
+  analogWriteResolution(actuator_5_position_control_pin,15);
+  analogWriteResolution(actuator_6_position_control_pin,15);
+  //Emergency Stop Interrupt
+  attachInterrupt(digitalPinToInterrupt(pin), emergency_ISR, CHANGE); // change pin to name
+
+}
