@@ -1,51 +1,68 @@
 #include "main.hpp"
-//testß
+
 
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
-#define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){}}
-
+#define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
+static bool first_entry = true;
+void testing_comm();
+void init_microros();
 // Error handle loop
 void error_loop() {
-  while(1) {
-    delay(100);
+  if(first_entry){
+    //add functions to turn off power and trigger emergency
+    first_entry = false;
   }
 }
 
 void subscription_callback(const void *msgin){
  
 }
-
+void heart_beat_callback(const void *msgin){
+  last_heartbeat_time = millis();
+}
 void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);
   //Sample the actuator positions and format it into ros2 message
   //Sample the system currents and format it into ros2 message
   //Samle the system temperatures and format it into ros2 messge
+  testing_comm();
   if (timer != NULL) {
     RCSOFTCHECK(rcl_publish(&actuator_positions_publisher, &actuator_positions_feedback, NULL));
     RCSOFTCHECK(rcl_publish(&system_currents_publisher, &system_currents, NULL));
     RCSOFTCHECK(rcl_publish(&system_temperatures_publisher, &system_temperatures, NULL));
     RCSOFTCHECK(rcl_publish(&diagnostics_publisher, &diagnostics, NULL));
-    RCSOFTCHECK(rcl_publish(&actuator_positions_publisher, &actuator_positions_feedback, NULL));
-  }
+    }
 }
 
 void setup() {
   Serial.begin(1000000);
   
-  delay(500);
+  delay(100);
+  pinMode(13, OUTPUT);
   init_microros();
-
+  teensy_setup();
+  digitalWrite(13, HIGH);
+  
 }
 
 void loop() {
   delay(100);
+  if(millis() - last_heartbeat_time > 2000){
+    // digitalWrite(13, HIGH);  // LED should turn on and stay on
+    // delay(100);
+    // digitalWrite(13, LOW);   // LED should turn off
+    // delay(100);
+  }
   RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
+  
 }
 
 void init_microros(){
-
+  
   set_microros_serial_transports(Serial);
   allocator = rcl_get_default_allocator();
+  
+
   //Create the supporter
   RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
   //Create the teensy node
@@ -85,9 +102,9 @@ void init_microros(){
       &communication_beat_subscriber,
       &teensy_hexabot_node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Empty),
-      "/hexabot_driver/heart_beat"))
+      "/hexabot_driver/heart_beat"));
   //Create timer for publishing the data
-  const unsigned int timer_timeout = 20; //this is time in millisecond, so the timer will fire 50 times in a second
+  const unsigned int timer_timeout = 1000; //this is time in millisecond, so the timer will fire 50 times in a second
   RCCHECK(rclc_timer_init_default(
     &timer,
     &support,
@@ -107,7 +124,7 @@ void init_microros(){
     &executor,
     &communication_beat_subscriber,
     &heart_beat_message,
-    &subscription_callback,
+    &heart_beat_callback,
     ON_NEW_DATA));
   //Allocate memory for messages
   actuator_positions_feedback.data.capacity = 8;
@@ -116,7 +133,7 @@ void init_microros(){
   system_currents.data.capacity = 9;
   system_currents.data.data = (float*) malloc(sizeof(float) * system_currents.data.capacity);
   system_currents.data.size = 0;
-  diagnostics.data.capacity = 10; //change this based on the number of flags we are sending.
+  diagnostics.data.capacity = 14; //change this based on the number of flags we are sending.
   diagnostics.data.data = (uint8_t*) malloc(sizeof(uint8_t) * diagnostics.data.capacity);
   diagnostics.data.size = 0;
   system_temperatures.data.capacity = 2;
@@ -177,13 +194,51 @@ void teensy_setup(){
   analogWriteFrequency(actuator_4_position_control_pin, 1000);
   analogWriteFrequency(actuator_5_position_control_pin, 1000);
 //analogWriteFrequency(servo_position_control_pin, 1000) //adjust this frequency based on servo data sheet
-  analogWriteResolution(actuator_1_position_control_pin,15);
-  analogWriteResolution(actuator_2_position_control_pin,15);
-  analogWriteResolution(actuator_3_position_control_pin,15);
-  analogWriteResolution(actuator_4_position_control_pin,15);
-  analogWriteResolution(actuator_5_position_control_pin,15);
-  analogWriteResolution(actuator_6_position_control_pin,15);
+  analogWriteResolution(15);
   //Emergency Stop Interrupt
-  attachInterrupt(digitalPinToInterrupt(pin), emergency_ISR, CHANGE); // change pin to name
+  //attachInterrupt(digitalPinToInterrupt(estop_signal_pin), emergency_ISR, CHANGE); // change pin to name
 
+}
+
+void testing_comm(){
+  actuator_positions_feedback.data.data[0] = 10;
+  actuator_positions_feedback.data.data[1] = 11;
+  actuator_positions_feedback.data.data[2] = 12;
+  actuator_positions_feedback.data.data[3] = 13;
+  actuator_positions_feedback.data.data[4] = 14;
+  actuator_positions_feedback.data.data[5] = 15;
+  actuator_positions_feedback.data.data[6] = 16;
+  actuator_positions_feedback.data.data[7] = 3.14;
+  actuator_positions_feedback.data.size = 8;
+
+  system_currents.data.data[0] = 0;
+  system_currents.data.data[1] = 1;
+  system_currents.data.data[2] = 2;
+  system_currents.data.data[3] = 3;
+  system_currents.data.data[4] = 4;
+  system_currents.data.data[5] = 5;
+  system_currents.data.data[6] = 6;
+  system_currents.data.data[7] = 7;
+  system_currents.data.data[8] = 3.14;
+  system_currents.data.size = 9;
+
+  diagnostics.data.data[0] = 0;
+  diagnostics.data.data[1] = 1;
+  diagnostics.data.data[2] = 2;
+  diagnostics.data.data[3] = 3;
+  diagnostics.data.data[4] = 4;
+  diagnostics.data.data[5] = 5;
+  diagnostics.data.data[6] = 6;
+  diagnostics.data.data[7] = 7;
+  diagnostics.data.data[8] = 8;
+  diagnostics.data.data[9] = 9;
+  diagnostics.data.data[10] = 10;
+  diagnostics.data.data[11] = 11;
+  diagnostics.data.data[12] = 12;
+  diagnostics.data.data[13] = 3.14;
+  diagnostics.data.size = 14;
+  system_temperatures.data.data[0] = 0;
+  system_temperatures.data.data[1] = 1;
+  system_temperatures.data.data[2] = 2;
+  system_temperatures.data.size = 3;
 }

@@ -37,7 +37,7 @@ rclc_support_t support;
 rcl_allocator_t allocator;
 rcl_node_t teensy_hexabot_node;
 rcl_timer_t timer;
-
+rcl_ret_t ret;
 //Naming scheme follows meaningful name + "pin" to indicate a constant for 
 //pin assignment to the Teensy. Anything else is a variable used in dynamically in the code
 //////// WE NEED TO ADD ALL MICROROS ASSIGNMENTS HERE INCLUDING THE MACROS.
@@ -105,7 +105,12 @@ int actuator_4_duty_cycle = 0;
 int actuator_5_duty_cycle = 0;
 int actuator_6_duty_cycle = 0;
 int servo_duty_cycle = 0;
-void emergency_ISR();
-void emergency_sequance();
-void recover_from_emergency();
+
+unsigned long last_heartbeat_time = 0;
+//void emergency_ISR();
+//void emergency_sequance();
+//void recover_from_emergency();
 void teensy_setup();
+void testing_comm();
+void init_microros();
+void heart_beat_callbak();
