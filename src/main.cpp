@@ -1,6 +1,5 @@
 #include "main.hpp"
 
-
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
 static bool first_entry = true;
@@ -12,6 +11,7 @@ void error_loop() {
     //add functions to turn off power and trigger emergency
     first_entry = false;
   }
+  SCB_AIRCR = 0x05FA0004;
 }
 
 void subscription_callback(const void *msgin){
@@ -47,6 +47,7 @@ void setup() {
 
 void loop() {
   delay(100);
+  digitalWrite(13,HIGH);
   if(millis() - last_heartbeat_time > 2000){
     // digitalWrite(13, HIGH);  // LED should turn on and stay on
     // delay(100);
