@@ -236,10 +236,10 @@ void testing_comm(){
   diagnostics.data.data[10] = 10;
   diagnostics.data.data[11] = 11;
   diagnostics.data.data[12] = 12;
-  diagnostics.data.data[13] = 3.14;
+  diagnostics.data.data[13] = 5; //because the type is uint
   diagnostics.data.size = 14;
   system_temperatures.data.data[0] = 0;
   system_temperatures.data.data[1] = 1;
-  system_temperatures.data.data[2] = 2;
+  system_temperatures.data.data[2] = 3.14;
   system_temperatures.data.size = 3;
 }
