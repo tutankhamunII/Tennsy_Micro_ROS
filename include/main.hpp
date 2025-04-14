@@ -113,4 +113,4 @@ unsigned long last_heartbeat_time = 0;
 void teensy_setup();
 void testing_comm();
 void init_microros();
-void heart_beat_callbak();
+void heart_beat_callback();
