@@ -29,7 +29,7 @@ std_msgs__msg__Float32MultiArray actuator_positions_feedback;
 std_msgs__msg__Float32MultiArray system_currents;
 std_msgs__msg__UInt8MultiArray diagnostics;
 std_msgs__msg__Float32MultiArray system_temperatures;
-std_msgs__msg__Float32MultiArray actuator_positions_command; 
+std_msgs__msg__Int32MultiArray actuator_positions_command; 
 std_msgs__msg__Empty heart_beat_message;
 //rclc and node initiation.
 rclc_executor_t executor;
@@ -105,14 +105,28 @@ int actuator_4_duty_cycle = 0;
 int actuator_5_duty_cycle = 0;
 int actuator_6_duty_cycle = 0;
 int servo_duty_cycle = 0;
-
+//heart beat timer tracking variable
 unsigned long last_heartbeat_time = 0;
+//flags for safety
+static bool error_loop_first_entry = true;
+static bool driver_communication_flag = true;
+static bool reconnecting = false;
+static bool emergency_flag = false;
+static bool power_avaliable_flag = false;
 //void emergency_ISR();
-//void emergency_sequance();
+void emergency_sequance();
 //void recover_from_emergency();
 void teensy_setup();
-void testing_comm();
 void message_memory_allocation();
 void init_microros();
 void destroy_microros();
 void heart_beat_callback();
+void start_power();
+void stop_power();
+void get_diagnostics();
+void get_actuator_positions();
+void get_currents();
+void get_temperatures();
+void set_acuator_positions();
+void check_main_power();
+void publish_data();

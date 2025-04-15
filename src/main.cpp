@@ -2,12 +2,22 @@
 
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
-static bool error_loop_first_entry = true;
-static bool driver_communication_flag = true;
-static bool reconnecting = false;
 
-void testing_comm();
+void emergency_sequance();
+void teensy_setup();
+void message_memory_allocation();
 void init_microros();
+void destroy_microros();
+void heart_beat_callback();
+void start_power();
+void stop_power();
+void get_diagnostics();
+void get_actuator_positions();
+void get_currents();
+void get_temperatures();
+void set_acuator_positions();
+void check_main_power();
+void publish_data();
 // Error handle loop
 void error_loop() {
   if(error_loop_first_entry){
@@ -20,8 +30,11 @@ void error_loop() {
   init_microros();
 }
 
-void subscription_callback(const void *msgin){
- 
+void actuator_commands_callback(const void *msgin){
+  if(power_avaliable_flag){
+    const std_msgs__msg__Int32MultiArray *msg = (const std_msgs__msg__Int32MultiArray *)msgin;
+    actuator_positions_command = *msg;
+  }
 }
 void heart_beat_callback(const void *msgin){
   last_heartbeat_time = millis();
@@ -52,13 +65,16 @@ void setup() {
 
 void loop() {
   
-    rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10));
-
+  rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10));
   digitalWrite(communication_LED_blue_pin, LOW);
+  check_main_power();
   if(millis() - last_heartbeat_time > 200){
     digitalWrite(communication_LED_green_pin, LOW);
     digitalWrite(communication_LED_red_pin, HIGH);
     if(!reconnecting){
+      get_actuator_positions();
+      stop_power();
+      emergency_sequance();
       driver_communication_flag = false;
       reconnecting = true;
       destroy_microros();
@@ -67,15 +83,26 @@ void loop() {
     }
     //call a function that stops the actuators here.
   }
+  //Communication is good, check for emergency flags and 
+  //main power before doing anything else.
   else{
-    // if(!driver_communication_flag){
-    //   driver_communication_flag = true;
-    //   //call a function that restarts the actuators here.
-
-    // }
     digitalWrite(communication_LED_blue_pin, LOW);
     digitalWrite(communication_LED_red_pin, LOW);
     digitalWrite(communication_LED_green_pin, HIGH);
+    if(!emergency_flag && power_avaliable_flag){
+      get_diagnostics();
+      get_currents();
+      get_actuator_positions();
+      get_temperatures();
+      //publish_data();
+      set_actuator_positions();
+    }
+    else if(emergency_flag){
+      //Save current positions first then turn off actuators.
+      get_actuator_positions();
+      stop_power();
+      emergency_sequance(); 
+    }
     
   }
 }
@@ -149,7 +176,7 @@ void init_microros(){
     &executor,
     &actuator_positions_subscriber,
     &actuator_positions_command,
-    &subscription_callback,
+    &actuator_commands_callback,
     ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(
     &executor,
@@ -157,9 +184,10 @@ void init_microros(){
     &heart_beat_message,
     &heart_beat_callback,
     ON_NEW_DATA));
-  //driver_communication_flag = false;
+
   last_heartbeat_time = millis();
   reconnecting = false;
+  start_power();
 }
 
 void destroy_microros() {
@@ -184,7 +212,6 @@ void destroy_microros() {
 
   // Finalize support structure
   rclc_support_fini(&support);
-  digitalWrite(power_LED_red_pin, HIGH); //remove - for test only
 }
 
 void message_memory_allocation(){
@@ -258,49 +285,131 @@ void teensy_setup(){
 //analogWriteFrequency(servo_position_control_pin, 1000) //adjust this frequency based on servo data sheet
   analogWriteResolution(15);
   //Emergency Stop Interrupt
-  //attachInterrupt(digitalPinToInterrupt(estop_signal_pin), emergency_ISR, CHANGE); // change pin to name
-
+  attachInterrupt(digitalPinToInterrupt(estop_signal_pin), emergency_ISR, CHANGE); // change pin to name
+  digitalWriteFast(switch_control_pin, HIGH);
 }
 
-void testing_comm(){
-  actuator_positions_feedback.data.data[0] = 10;
-  actuator_positions_feedback.data.data[1] = 11;
-  actuator_positions_feedback.data.data[2] = 12;
-  actuator_positions_feedback.data.data[3] = 13;
-  actuator_positions_feedback.data.data[4] = 14;
-  actuator_positions_feedback.data.data[5] = 15;
-  actuator_positions_feedback.data.data[6] = 16;
-  actuator_positions_feedback.data.data[7] = 3.14;
-  actuator_positions_feedback.data.size = 8;
+void start_power(){
+  digitalWriteFast(voltage_translator_control_pin,HIGH);
+  digitalWriteFast(actuator_1_power_control_pin,HIGH);
+  digitalWriteFast(actuator_2_power_control_pin,HIGH);
+  digitalWriteFast(actuator_3_power_control_pin,HIGH);
+  digitalWriteFast(actuator_4_power_control_pin,HIGH);
+  digitalWriteFast(actuator_5_power_control_pin,HIGH);
+  digitalWriteFast(actuator_6_power_control_pin,HIGH);
+  digitalWriteFast(servo_power_control_pin,HIGH);
+  digitalWriteFast(switch_control_pin, LOW);
+  delay(100);
+  digitalWriteFasst(switch_control_pin,HIGH);
+  delay(100);
+  return;
+}
+void stop_power(){
+  digitalWriteFast(voltage_translator_control_pin, LOW);
+  digitalWriteFast(actuator_1_power_control_pin,LOW);
+  digitalWriteFast(actuator_2_power_control_pin,LOW);
+  digitalWriteFast(actuator_3_power_control_pin,LOW);
+  digitalWriteFast(actuator_4_power_control_pin,LOW);
+  digitalWriteFast(actuator_5_power_control_pin,LOW);
+  digitalWriteFast(actuator_6_power_control_pin,LOW);
+  digitalWriteFast(servo_power_control_pin,LOW);
+  digitalWriteFast(switch_control_pin, LOW);
+  delay(100);
+  digitalWriteFasst(switch_control_pin,HIGH);
+  delay(100);
+  return;
+}
 
-  system_currents.data.data[0] = 0;
-  system_currents.data.data[1] = 1;
-  system_currents.data.data[2] = 2;
-  system_currents.data.data[3] = 3;
-  system_currents.data.data[4] = 4;
-  system_currents.data.data[5] = 5;
-  system_currents.data.data[6] = 6;
-  system_currents.data.data[7] = 7;
-  system_currents.data.data[8] = 3.14;
-  system_currents.data.size = 9;
-
-  diagnostics.data.data[0] = 0;
-  diagnostics.data.data[1] = 1;
-  diagnostics.data.data[2] = 2;
-  diagnostics.data.data[3] = 3;
-  diagnostics.data.data[4] = 4;
-  diagnostics.data.data[5] = 5;
-  diagnostics.data.data[6] = 6;
-  diagnostics.data.data[7] = 7;
-  diagnostics.data.data[8] = 8;
-  diagnostics.data.data[9] = 9;
-  diagnostics.data.data[10] = 10;
-  diagnostics.data.data[11] = 11;
-  diagnostics.data.data[12] = 12;
-  diagnostics.data.data[13] = 5; //because the type is uint
+void get_diagnosstics(){
+  diagnostics.data.data[0] = digitalReadFast(main_power_feedback_pin);
+  diagnostics.data.data[1] = digitalReadFast(switch_status_pin);
+  diagnostics.data.data[2] = digitalReadFast(estop_signal_pin);
+  diagnostics.data.data[3] = digitalReadFast(voltage_translator_control_pin);
+  diagnostics.data.data[4] = digitalReadFast(actuator_1_power_control_pin);
+  diagnostics.data.data[5] = digitalReadFast(actuator_2_power_control_pin);
+  diagnostics.data.data[6] = digitalReadFast(actuator_3_power_control_pin);
+  diagnostics.data.data[7] = digitalReadFast(actuator_4_power_control_pin);
+  diagnostics.data.data[8] = digitalReadFast(actuator_5_power_control_pin);
+  diagnostics.data.data[9] = digitalReadFast(actuator_6_power_control_pin);
+  diagnostics.data.data[10] = digitalReadFast(servo_power_control_pin);
+  diagnostics.data.data[11] = 0; //maybe edit later
+  diagnostics.data.data[12] = 0; //maybe edit later
+  diagnostics.data.data[13] = 5; //changed to 5 since type is uint
   diagnostics.data.size = 14;
-  system_temperatures.data.data[0] = 0;
-  system_temperatures.data.data[1] = 1;
-  system_temperatures.data.data[2] = 3.14;
-  system_temperatures.data.size = 3;
+  return;
+}
+void get_currents(){
+  //OMAR WORK
+  return;
+}
+void get_temperatures(){
+  //OMAR WORK
+  return;
+}
+void get_actuator_positions(){
+  return;
+}
+void emergency_ISR(){
+  bool current_state = digitalRead(estop_signal_pin);
+  //DIAG pin went from LOW to HIGH = E-stop is disengaged
+  if(current_state){
+    emergency_flag = false;
+    digitalWriteFast(power_LED_red_pin,LOW);
+    digitalWriteFast(power_LED_green_pin,HIGH);
+    digitalWriteFast(power_LED_blue_pin,LOW);
+    start_power();
+  }
+  //DIAG pin went from HIGH to LOW = E-stop is engaged
+  else{
+    emergency_flag = true;
+    digitalWriteFast(power_LED_red_pin,LOW);
+    digitalWriteFast(power_LED_green_pin,LOW);
+    digitalWriteFast(power_LED_blue_pin,HIGH);
+  }
+  
+  return;
+}
+void emergency_sequence(){
+  actuator_1_duty_cycle = (actuator_1_position_feedback / 30) * 32757;
+  actuator_2_duty_cycle = (actuator_2_position_feedback / 30) * 32575;
+  actuator_3_duty_cycle = (actuator_3_position_feedback / 30) * 32575;
+  actuator_4_duty_cycle = (actuator_4_position_feedback / 30) * 32575;
+  actuator_5_duty_cycle = (actuator_5_position_feedback / 30) * 32575;
+  actuator_6_duty_cycle = (actuator_6_position_feedback / 30) * 32575;
+  //DO WE NEED TO DO SOMETHING ABOUT THE SERVO????
+  //Assign those duty cycles to actuators
+  set_acuator_positions();
+}
+void set_actuator_positions(){
+  analogWrite(actuator_1_position_control_pin, actuator_1_duty_cycle);
+  analogWrite(actuator_2_position_control_pin, actuator_2_duty_cycle);
+  analogWrite(actuator_3_position_control_pin, actuator_3_duty_cycle);
+  analogWrite(actuator_4_position_control_pin, actuator_4_duty_cycle);
+  analogWrite(actuator_5_position_control_pin, actuator_5_duty_cycle);
+  analogWrite(actuator_6_position_control_pin, actuator_6_duty_cycle);
+  //analogWrite(servo_position_control_pin, servo_duty_cycle);
+  return;
+}
+void check_main_power(){
+  power_avaliable_flag = digitalReadFast(main_power_feedback_pin);
+  if(!emergency_flag){
+    if(!power_avaliable_flag){
+      digitalWriteFast(power_LED_red_pin,HIGH);
+      digitalWriteFast(power_LED_green_pin,LOW);
+      digitalWriteFast(power_LED_blue_pin,LOW);
+    }
+    else{
+      digitalWriteFast(power_LED_red_pin,LOW);
+      digitalWriteFast(power_LED_green_pin,HIGH);
+      digitalWriteFast(power_LED_blue_pin,LOW);
+    }
+  }
+  return;
+}
+void publish_data(){
+  rcl_publish(&actuator_positions_publisher, &actuator_positions_feedback, NULL);
+  rcl_publish(&system_currents_publisher, &system_currents, NULL);
+  rcl_publish(&system_temperatures_publisher, &system_temperatures, NULL);
+  rcl_publish(&diagnostics_publisher, &diagnostics, NULL);
+  return;
 }
