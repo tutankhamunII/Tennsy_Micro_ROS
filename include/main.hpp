@@ -112,5 +112,7 @@ unsigned long last_heartbeat_time = 0;
 //void recover_from_emergency();
 void teensy_setup();
 void testing_comm();
+void message_memory_allocation();
 void init_microros();
+void destroy_microros();
 void heart_beat_callback();

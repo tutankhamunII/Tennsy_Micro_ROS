@@ -2,16 +2,22 @@
 
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
-static bool first_entry = true;
+static bool error_loop_first_entry = true;
+static bool driver_communication_flag = true;
+static bool reconnecting = false;
+
 void testing_comm();
 void init_microros();
 // Error handle loop
 void error_loop() {
-  if(first_entry){
+  if(error_loop_first_entry){
     //add functions to turn off power and trigger emergency
-    first_entry = false;
+    error_loop_first_entry = false;
   }
-  SCB_AIRCR = 0x05FA0004;
+  //SCB_AIRCR = 0x05FA0004; 
+  destroy_microros();
+  delay(10);
+  init_microros();
 }
 
 void subscription_callback(const void *msgin){
@@ -27,45 +33,69 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
   //Samle the system temperatures and format it into ros2 messge
   testing_comm();
   if (timer != NULL) {
-    RCSOFTCHECK(rcl_publish(&actuator_positions_publisher, &actuator_positions_feedback, NULL));
-    RCSOFTCHECK(rcl_publish(&system_currents_publisher, &system_currents, NULL));
-    RCSOFTCHECK(rcl_publish(&system_temperatures_publisher, &system_temperatures, NULL));
-    RCSOFTCHECK(rcl_publish(&diagnostics_publisher, &diagnostics, NULL));
+    rcl_publish(&actuator_positions_publisher, &actuator_positions_feedback, NULL);
+    rcl_publish(&system_currents_publisher, &system_currents, NULL);
+    rcl_publish(&system_temperatures_publisher, &system_temperatures, NULL);
+    rcl_publish(&diagnostics_publisher, &diagnostics, NULL);
     }
 }
 
 void setup() {
+  teensy_setup();
+  message_memory_allocation();
   Serial.begin(1000000);
-  
-  delay(100);
   pinMode(13, OUTPUT);
   init_microros();
-  teensy_setup();
   digitalWrite(13, HIGH);
   
 }
 
 void loop() {
-  delay(100);
-  digitalWrite(13,HIGH);
-  if(millis() - last_heartbeat_time > 2000){
-    // digitalWrite(13, HIGH);  // LED should turn on and stay on
-    // delay(100);
-    // digitalWrite(13, LOW);   // LED should turn off
-    // delay(100);
-  }
-  RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
   
+    rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10));
+
+  digitalWrite(communication_LED_blue_pin, LOW);
+  if(millis() - last_heartbeat_time > 200){
+    digitalWrite(communication_LED_green_pin, LOW);
+    digitalWrite(communication_LED_red_pin, HIGH);
+    if(!reconnecting){
+      driver_communication_flag = false;
+      reconnecting = true;
+      destroy_microros();
+      delay(10);
+      init_microros();
+    }
+    //call a function that stops the actuators here.
+  }
+  else{
+    // if(!driver_communication_flag){
+    //   driver_communication_flag = true;
+    //   //call a function that restarts the actuators here.
+
+    // }
+    digitalWrite(communication_LED_blue_pin, LOW);
+    digitalWrite(communication_LED_red_pin, LOW);
+    digitalWrite(communication_LED_green_pin, HIGH);
+    
+  }
 }
 
 void init_microros(){
-  
+  //bool correct = false;
+  //digitalWrite(power_LED_red_pin, LOW); //remove - for test only
+
   set_microros_serial_transports(Serial);
   allocator = rcl_get_default_allocator();
-  
-
   //Create the supporter
-  RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
+  rcl_ret_t ret;
+  do{
+    digitalWrite(communication_LED_blue_pin, HIGH);
+    digitalWrite(communication_LED_red_pin,LOW);
+    digitalWrite(communication_LED_green_pin,LOW);
+    ret = rclc_support_init(&support, 0, NULL, &allocator);
+    delay(1000);
+  } while(ret != RCL_RET_OK);
+  //RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
   //Create the teensy node
   RCCHECK(rclc_node_init_default(&teensy_hexabot_node, "teensy_hexabot_node", "", &support));
   //Publisher init for actuator_positions
@@ -127,6 +157,37 @@ void init_microros(){
     &heart_beat_message,
     &heart_beat_callback,
     ON_NEW_DATA));
+  //driver_communication_flag = false;
+  last_heartbeat_time = millis();
+  reconnecting = false;
+}
+
+void destroy_microros() {
+  // Stop executor first to avoid running callbacks during teardown
+  rclc_executor_fini(&executor);
+
+  // Finalize all timers
+  rcl_timer_fini(&timer);
+
+  // Finalize all subscriptions
+  rcl_subscription_fini(&actuator_positions_subscriber, &teensy_hexabot_node);
+  rcl_subscription_fini(&communication_beat_subscriber, &teensy_hexabot_node);
+
+  // Finalize all publishers
+  rcl_publisher_fini(&actuator_positions_publisher, &teensy_hexabot_node);
+  rcl_publisher_fini(&system_currents_publisher, &teensy_hexabot_node);
+  rcl_publisher_fini(&system_temperatures_publisher, &teensy_hexabot_node);
+  rcl_publisher_fini(&diagnostics_publisher, &teensy_hexabot_node);
+
+  // Finalize node
+  rcl_node_fini(&teensy_hexabot_node);
+
+  // Finalize support structure
+  rclc_support_fini(&support);
+  digitalWrite(power_LED_red_pin, HIGH); //remove - for test only
+}
+
+void message_memory_allocation(){
   //Allocate memory for messages
   actuator_positions_feedback.data.capacity = 8;
   actuator_positions_feedback.data.data = (float*) malloc(sizeof(float) * actuator_positions_feedback.data.capacity);
@@ -143,8 +204,6 @@ void init_microros(){
   actuator_positions_command.data.data = (float*) malloc(sizeof(float) * actuator_positions_command.data.capacity);
   actuator_positions_command.data.size = 8;  
 }
-
-
 void teensy_setup(){
   pinMode(power_LED_blue_pin, OUTPUT);
   pinMode(power_LED_green_pin, OUTPUT);
@@ -194,6 +253,8 @@ void teensy_setup(){
   analogWriteFrequency(actuator_3_position_control_pin, 1000);
   analogWriteFrequency(actuator_4_position_control_pin, 1000);
   analogWriteFrequency(actuator_5_position_control_pin, 1000);
+  analogWriteFrequency(actuator_6_position_control_pin, 1000);
+
 //analogWriteFrequency(servo_position_control_pin, 1000) //adjust this frequency based on servo data sheet
   analogWriteResolution(15);
   //Emergency Stop Interrupt
