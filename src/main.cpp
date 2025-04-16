@@ -338,11 +338,47 @@ void get_diagnosstics(){
   diagnostics.data.size = 14;
   return;
 }
-void get_currents(){
+void get_currents(){ // TBD if 32757.0 should change to 1023
+  // current calculations
+  const float Voffset = 1.65;
+  const float sensitivity = 0.132;
+  float voltage;
+
+  system_currents.data.size = 8;
+  
+  voltage = (static_cast<float>(analogRead(actuator_1_current_feedback_pin)) / 32767.0) * 3.3; // conversion to voltage
+  system_currents.data.data[0] = (voltage - Voffset) / Sensitivity; // calculate current
+
+  voltage = (static_cast<float>(analogRead(actuator_2_current_feedback_pin)) / 32757.0) * 3.3;
+  system_currents.data.data[1] = (voltage - Voffset) / Sensitivity;
+
+  voltage = (static_cast<float>(analogRead(actuator_3_current_feedback_pin)) / 32757.0) * 3.3;
+  system_currents.data.data[2] = (voltage - Voffset) / Sensitivity;
+
+  voltage = (static_cast<float>(analogRead(actuator_4_current_feedback_pin)) / 32757.0) * 3.3;
+  system_currents.data.data[3] = (voltage - Voffset) / Sensitivity;
+
+  voltage = (static_cast<float>(analogRead(actuator_5_current_feedback_pin)) / 32757.0) * 3.3;
+  system_currents.data.data[4] = (voltage - Voffset) / Sensitivity;
+
+  voltage = (static_cast<float>(analogRead(actuator_6_current_feedback_pin)) / 32757.0) * 3.3;
+  system_currents.data.data[5] = (voltage - Voffset) / Sensitivity;
+
+  voltage = (static_cast<float>(analogRead(servo_current_feedback_pin)) / 32757.0) * 3.3;
+  system_currents.data.data[6] = (voltage - Voffset) / Sensitivity;
+
+  voltage = (static_cast<float>(analogRead(total_current_feedback_pin)) / 32757.0) * 3.3;
+  system_currents.data.data[7] = (voltage - Voffset) / Sensitivity;
+
   //OMAR WORK
   return;
 }
 void get_temperatures(){
+
+  //constexpr int temp_sensor_pin = temperature_pin;
+  int raw_temperature_reading = analogRead(temperature_pin);
+
+
   //OMAR WORK
   return;
 }
