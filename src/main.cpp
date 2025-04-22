@@ -33,7 +33,11 @@ void error_loop() {
 
 void actuator_commands_callback(const void *msgin){
   const std_msgs__msg__Int32MultiArray *msg = (const std_msgs__msg__Int32MultiArray *)msgin;
-  if(emergency_flag){
+  //if(emergency_flag){
+  digitalWrite(13,HIGH);
+  delay(100);
+  digitalWrite(13,LOW);
+  delay(100);
     actuator_positions_command = *msg;
     actuator_1_duty_cycle = actuator_positions_command.data.data[0];
     actuator_2_duty_cycle = actuator_positions_command.data.data[1];
@@ -42,7 +46,7 @@ void actuator_commands_callback(const void *msgin){
     actuator_5_duty_cycle = actuator_positions_command.data.data[4];
     actuator_6_duty_cycle = actuator_positions_command.data.data[5];
     servo_duty_cycle = actuator_positions_command.data.data[6];
-  }
+  //}
   
 }
 void heart_beat_callback(const void *msgin){
@@ -69,7 +73,7 @@ void setup() {
 void loop() {
   rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10));
   digitalWrite(communication_LED_blue_pin, LOW);
-  if(millis() - last_heartbeat_time > 200){
+  if(millis() - last_heartbeat_time > 1000){
     red_comm_LED();
     if(!reconnecting){
       get_actuator_positions();
@@ -269,7 +273,7 @@ void teensy_setup(){
     check_main_power();
   }
   while(!emergency_flag){
-    blink_teensy_LED(500);
+    blink_teensy_LED(10);
   }
 }
 
@@ -350,7 +354,7 @@ void get_currents(){
   voltage = (static_cast<float>(analogRead(total_current_feedback_pin)) / 4095.0) * 3.3;
   system_currents.data.data[7] = (voltage - Voffset) / sensitivity;
   system_currents.data.data[8] = 3.14;
-  system_currents.data.size = 8;
+  system_currents.data.size = 9;
 
   return;
 }
@@ -363,28 +367,34 @@ void get_temperatures(){
   return;
 }
 void get_actuator_positions(){
-  float position = (analogRead(actuator_1_position_feedback_pin) / 4095.0) * 3.3;
-  position = (-9.8039 * position) + 31.5686;
+  float position = (analogRead(actuator_1_position_feedback_pin) / 4095.0f) * 3.3f;
+  position = ((3.22f - position) / (3.22f - 0.1613f)) * 30.0f;
+  position = constrain(position, 0.0f, 30.0f);
   actuator_positions_feedback.data.data[0] = position;
   actuator_1_position_feedback = position;
-  position = (analogRead(actuator_2_position_feedback_pin) / 4095.0) * 3.3;
-  position = (-9.8039 * position) + 31.5686;
+  position = (analogRead(actuator_2_position_feedback_pin) / 4095.0f) * 3.3f;
+  position = ((3.22f - position) / (3.22f - 0.1613f)) * 30.0f;
+  position = constrain(position, 0.0f, 30.0f);
   actuator_positions_feedback.data.data[1] = position;
   actuator_2_position_feedback = position;
-  position = (analogRead(actuator_3_position_feedback_pin) / 4095.0) * 3.3;
-  position = (-9.8039 * position) + 31.5686;
+  position = (analogRead(actuator_3_position_feedback_pin) / 4095.0f) * 3.3f;
+  position = ((3.22f - position) / (3.22f - 0.1613f)) * 30.0f;
+  position = constrain(position, 0.0f, 30.0f);
   actuator_positions_feedback.data.data[2] = position;
   actuator_3_position_feedback = position;
-  position = (analogRead(actuator_4_position_feedback_pin) / 4095.0) * 3.3;
-  position = (-9.8039 * position) + 31.5686;
+  position = (analogRead(actuator_4_position_feedback_pin) / 4095.0f) * 3.3f;
+  position = ((3.22f - position) / (3.22f - 0.1613f)) * 30.0f;
+  position = constrain(position, 0.0f, 30.0f);
   actuator_positions_feedback.data.data[3] = position;
   actuator_4_position_feedback = position;
-  position = (analogRead(actuator_5_position_feedback_pin) / 4095.0) * 3.3;
-  position = (-9.8039 * position) + 31.5686;
+  position = (analogRead(actuator_5_position_feedback_pin) / 4095.0f) * 3.3f;
+  position = ((3.22f - position) / (3.22f - 0.1613f)) * 30.0f;
+  position = constrain(position, 0.0f, 30.0f);
   actuator_positions_feedback.data.data[4] = position;
   actuator_5_position_feedback = position;
-  position = (analogRead(actuator_6_position_feedback_pin) / 4095.0) * 3.3;
-  position = (-9.8039 * position) + 31.5686;
+  position = (analogRead(actuator_6_position_feedback_pin) / 4095.0f) * 3.3f;
+  position = ((3.22f - position) / (3.22f - 0.1613f)) * 30.0f;
+  position = constrain(position, 0.0f, 30.0f);
   actuator_positions_feedback.data.data[5] = position;
   actuator_6_position_feedback = position;
   actuator_positions_feedback.data.data[6] = 0; //servo position edit this!
@@ -399,12 +409,15 @@ void emergency_ISR(){
     if(pin_state){
       emergency_flag = true;
       start_power();
+      get_actuator_positions();
+      maintain_positions();
       green_power_LED();
     }
     else{
       emergency_flag = false;
       red_power_LED();
       maintain_positions();
+      stop_power();
     }
     last_emergency_time = current_time;
   }
@@ -473,12 +486,12 @@ void blue_comm_LED(){
   return;
 }
 void maintain_positions(){
-  actuator_1_duty_cycle = (actuator_1_position_feedback / 30) * 32767;
-  actuator_2_duty_cycle = (actuator_2_position_feedback / 30) * 32767;
-  actuator_3_duty_cycle = (actuator_3_position_feedback / 30) * 32767;
-  actuator_4_duty_cycle = (actuator_4_position_feedback / 30) * 32767;
-  actuator_5_duty_cycle = (actuator_5_position_feedback / 30) * 32767;
-  actuator_6_duty_cycle = (actuator_6_position_feedback / 30) * 32767;
+  actuator_1_duty_cycle = (actuator_1_position_feedback / 26) * 32757;
+  actuator_2_duty_cycle = (actuator_2_position_feedback / 26) * 32757;
+  actuator_3_duty_cycle = (actuator_3_position_feedback / 26) * 32757;
+  actuator_4_duty_cycle = (actuator_4_position_feedback / 26) * 32757;
+  actuator_5_duty_cycle = (actuator_5_position_feedback / 26) * 32757;
+  actuator_6_duty_cycle = (actuator_6_position_feedback / 26) * 32757;
   //DO WE NEED TO DO SOMETHING ABOUT THE servo????
   //Assign those duty cycles to actuators
   set_actuator_positions();
